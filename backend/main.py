@@ -25,15 +25,21 @@ app = FastAPI(
 
 # Configure CORS for frontend access.
 # Set CORS_ORIGINS as a comma-separated list in production.
+def _normalize_origin(origin: str) -> str:
+    if origin == "*":
+        return origin
+    return origin.strip().rstrip("/")
+
+
 default_origins = [
-    "http://localhost:5173",  # Vite dev server
-    "http://localhost:3000",  # Alternative dev server
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:3000",
+    _normalize_origin("http://localhost:5173"),  # Vite dev server
+    _normalize_origin("http://localhost:3000"),  # Alternative dev server
+    _normalize_origin("http://127.0.0.1:5173"),
+    _normalize_origin("http://127.0.0.1:3000"),
 ]
 
 env_origins = [
-    origin.strip()
+    _normalize_origin(origin)
     for origin in os.getenv("CORS_ORIGINS", "").split(",")
     if origin.strip()
 ]
