@@ -6,7 +6,8 @@ services:
     repo: https://github.com/yugendragitz/AttendX
     branch: main
     rootDir: backend
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
