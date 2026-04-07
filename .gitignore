@@ -1,0 +1,31 @@
+# Frontend dependencies and build output
+frontend/node_modules/
+node_modules/
+frontend/dist/
+dist/
+.vite/
+
+# Python virtual environments and caches
+backend/venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Local debug artifacts
+backend/debug_*.png
+backend/debug_page.html
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
