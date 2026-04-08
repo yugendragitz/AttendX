@@ -5,6 +5,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     CHROME_BIN=/usr/bin/chromium \
     CHROMEDRIVER_PATH=/usr/bin/chromedriver \
     DISABLE_WEBDRIVER_MANAGER=true \
+    ENABLE_TIMETABLE_SCRAPE=false \
+    SESSION_TTL_SECONDS=180 \
+    MAX_ACTIVE_SESSIONS=3 \
     PORT=10000
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

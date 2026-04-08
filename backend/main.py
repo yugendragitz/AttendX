@@ -46,10 +46,12 @@ env_origins = [
 
 allow_all_origins = "*" in env_origins
 allowed_origins = ["*"] if allow_all_origins else list(dict.fromkeys(default_origins + env_origins))
+origin_regex = None if allow_all_origins else os.getenv("CORS_ORIGIN_REGEX", r"https://.*\.vercel\.app")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=origin_regex,
     allow_credentials=not allow_all_origins,
     allow_methods=["*"],
     allow_headers=["*"],

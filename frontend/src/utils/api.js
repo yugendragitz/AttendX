@@ -1,6 +1,17 @@
 // API client for communicating with the FastAPI backend
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const DEFAULT_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 45000)
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
 
 /**
  * Step 1: Initialize login and get CAPTCHA image
@@ -10,15 +21,15 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
  */
 export async function initLogin(username, password) {
   try {
-    const response = await fetch(`${API_BASE_URL}/init-login`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/init-login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ username, password }),
-    })
+    }, 60000)
 
-    const data = await response.json()
+    const data = await response.json().catch(() => ({}))
 
     if (!response.ok) {
       return {
@@ -34,6 +45,12 @@ export async function initLogin(username, password) {
     }
   } catch (error) {
     console.error('API Error:', error)
+    if (error.name === 'AbortError') {
+      return {
+        success: false,
+        message: 'Server is taking too long. It may be waking up, please retry in a few seconds.',
+      }
+    }
     return {
       success: false,
       message: 'Connection error. Please check if the server is running.',
@@ -49,15 +66,15 @@ export async function initLogin(username, password) {
  */
 export async function completeLogin(sessionId, captchaCode) {
   try {
-    const response = await fetch(`${API_BASE_URL}/complete-login`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/complete-login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ session_id: sessionId, captcha_code: captchaCode }),
-    })
+    }, 90000)
 
-    const data = await response.json()
+    const data = await response.json().catch(() => ({}))
 
     if (!response.ok) {
       return {
@@ -70,9 +87,16 @@ export async function completeLogin(sessionId, captchaCode) {
       success: true,
       student_name: data.student_name || 'Student',
       subjects: data.subjects || [],
+      timetable: data.timetable || null,
     }
   } catch (error) {
     console.error('API Error:', error)
+    if (error.name === 'AbortError') {
+      return {
+        success: false,
+        message: 'Login is taking too long. Please try once more.',
+      }
+    }
     return {
       success: false,
       message: 'Connection error. Please try again.',
@@ -88,15 +112,15 @@ export async function completeLogin(sessionId, captchaCode) {
  */
 export async function loginAndFetchAttendance(username, password) {
   try {
-    const response = await fetch(`${API_BASE_URL}/login`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ username, password }),
-    })
+    }, 90000)
 
-    const data = await response.json()
+    const data = await response.json().catch(() => ({}))
 
     if (!response.ok) {
       return {
@@ -112,6 +136,13 @@ export async function loginAndFetchAttendance(username, password) {
     }
   } catch (error) {
     console.error('API Error:', error)
+
+    if (error.name === 'AbortError') {
+      return {
+        success: false,
+        message: 'Request timed out. Please retry.',
+      }
+    }
     
     // For demo purposes, return mock data if server is not running
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
@@ -155,7 +186,7 @@ function getDemoData(username) {
  */
 export async function healthCheck() {
   try {
-    const response = await fetch(`${API_BASE_URL}/health`)
+    const response = await fetchWithTimeout(`${API_BASE_URL}/health`, {}, 10000)
     return response.ok
   } catch {
     return false

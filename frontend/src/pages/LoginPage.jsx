@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { HiUser, HiLockClosed, HiEye, HiEyeOff, HiRefresh, HiShieldCheck } from 'react-icons/hi'
@@ -8,7 +8,7 @@ import AnimatedButton from '../components/AnimatedButton'
 import PageTransition from '../components/PageTransition'
 import { LoginLoadingOverlay } from '../components/SkeletonLoader'
 import { useToast } from '../hooks/useToast.jsx'
-import { initLogin, completeLogin } from '../utils/api'
+import { initLogin, completeLogin, healthCheck } from '../utils/api'
 import { saveSession } from '../utils/storage'
 
 export default function LoginPage() {
@@ -29,6 +29,11 @@ export default function LoginPage() {
     password: '',
   })
   const [errors, setErrors] = useState({})
+
+  // Warm up backend so first CAPTCHA load feels faster on free-tier hosting.
+  useEffect(() => {
+    healthCheck().catch(() => {})
+  }, [])
 
   // Handle input changes
   const handleChange = (e) => {

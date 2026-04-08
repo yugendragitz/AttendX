@@ -34,6 +34,9 @@ except ImportError:
 # Store active browser sessions for CAPTCHA flow
 # Key: session_id, Value: {"driver": driver, "username": str, "password": str, "created": timestamp}
 ACTIVE_SESSIONS: Dict[str, Dict] = {}
+SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "180"))
+MAX_ACTIVE_SESSIONS = int(os.getenv("MAX_ACTIVE_SESSIONS", "3"))
+ENABLE_TIMETABLE_SCRAPE = os.getenv("ENABLE_TIMETABLE_SCRAPE", "false").lower() == "true"
 
 
 # KL University ERP Configuration
@@ -79,6 +82,51 @@ class AttendanceScraper:
         self.wait = None
         # Speed optimization: shorter timeouts
         self.fast_wait = None
+
+    def _close_stored_session(self, session_id: str):
+        """Close and remove a stored browser session by session ID."""
+        session = ACTIVE_SESSIONS.pop(session_id, None)
+        if not session:
+            return
+        driver = session.get("driver")
+        if driver:
+            try:
+                driver.quit()
+            except Exception:
+                pass
+
+    def _cleanup_expired_sessions(self):
+        """Remove browser sessions that exceeded the configured TTL."""
+        now = time.time()
+        expired_ids = [
+            session_id
+            for session_id, session in list(ACTIVE_SESSIONS.items())
+            if now - session.get("created", now) > SESSION_TTL_SECONDS
+        ]
+        for session_id in expired_ids:
+            self._close_stored_session(session_id)
+
+    def _cleanup_user_sessions(self, username: str):
+        """Keep only one in-progress CAPTCHA session per username."""
+        user_session_ids = [
+            session_id
+            for session_id, session in list(ACTIVE_SESSIONS.items())
+            if session.get("username") == username
+        ]
+        for session_id in user_session_ids:
+            self._close_stored_session(session_id)
+
+    def _enforce_session_limit(self):
+        """Cap concurrent browser sessions to avoid memory pressure on Render free instances."""
+        excess = len(ACTIVE_SESSIONS) - MAX_ACTIVE_SESSIONS
+        if excess <= 0:
+            return
+        oldest = sorted(
+            ACTIVE_SESSIONS.items(),
+            key=lambda item: item[1].get("created", 0)
+        )
+        for session_id, _ in oldest[:excess]:
+            self._close_stored_session(session_id)
     
     def _setup_driver(self):
         """Configure and initialize the Chrome WebDriver with speed optimizations."""
@@ -137,9 +185,9 @@ class AttendanceScraper:
             self.driver = webdriver.Chrome(options=options)
         
         # Shorter implicit wait for speed
-        self.driver.implicitly_wait(3)
-        self.wait = WebDriverWait(self.driver, 8)
-        self.fast_wait = WebDriverWait(self.driver, 3)
+        self.driver.implicitly_wait(2)
+        self.wait = WebDriverWait(self.driver, 6)
+        self.fast_wait = WebDriverWait(self.driver, 2)
     
     def _cleanup(self):
         """Close the browser and cleanup resources."""
@@ -177,6 +225,10 @@ class AttendanceScraper:
         OPTIMIZED for speed.
         """
         try:
+            self._cleanup_expired_sessions()
+            self._cleanup_user_sessions(username)
+            self._enforce_session_limit()
+
             self._setup_driver()
             
             # Navigate to login page
@@ -208,6 +260,21 @@ class AttendanceScraper:
             
             # Find and capture CAPTCHA image
             captcha_image_b64 = None
+
+            # Fast-path for common CAPTCHA selectors.
+            try:
+                captcha_img = self.fast_wait.until(
+                    EC.presence_of_element_located(
+                        (
+                            By.CSS_SELECTOR,
+                            "img[src*='captcha'], img[src*='Captcha'], #captcha-image, .captcha-img, img[alt*='captcha'], img[alt*='verification']"
+                        )
+                    )
+                )
+                captcha_image_b64 = captcha_img.screenshot_as_base64
+            except Exception:
+                pass
+
             captcha_selectors = [
                 "img[src*='captcha']",
                 "img[src*='Captcha']",
@@ -215,29 +282,18 @@ class AttendanceScraper:
                 "#captcha-image",
                 ".captcha-img",
                 "img[alt*='captcha']",
-                "img[alt*='verification']",
-                # KL ERP specific - usually the CAPTCHA is near the verification input
-                "img"
+                "img[alt*='verification']"
             ]
             
             for selector in captcha_selectors:
+                if captcha_image_b64:
+                    break
                 try:
-                    if selector == "img":
-                        # For generic img, look for ones near verification input
-                        images = self.driver.find_elements(By.TAG_NAME, "img")
-                        for img in images:
-                            src = img.get_attribute("src") or ""
-                            if "captcha" in src.lower() or "verification" in src.lower():
-                                # Get image as base64
-                                captcha_image_b64 = img.screenshot_as_base64
-                                print(f"Found CAPTCHA image via src")
-                                break
-                    else:
-                        captcha_img = self.driver.find_element(By.CSS_SELECTOR, selector)
-                        if captcha_img:
-                            captcha_image_b64 = captcha_img.screenshot_as_base64
-                            print(f"Found CAPTCHA with selector: {selector}")
-                            break
+                    captcha_img = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    if captcha_img:
+                        captcha_image_b64 = captcha_img.screenshot_as_base64
+                        print(f"Found CAPTCHA with selector: {selector}")
+                        break
                 except:
                     continue
             
@@ -397,10 +453,11 @@ class AttendanceScraper:
             
             print(f"Found {len(subjects)} subjects")
             
-            # Also fetch timetable
-            print("Fetching timetable...")
-            timetable_result = self._scrape_timetable()
-            timetable = timetable_result.get("timetable", {}) if timetable_result.get("success") else {}
+            timetable = {}
+            if ENABLE_TIMETABLE_SCRAPE:
+                print("Fetching timetable...")
+                timetable_result = self._scrape_timetable()
+                timetable = timetable_result.get("timetable", {}) if timetable_result.get("success") else {}
             
             self._cleanup()
             
