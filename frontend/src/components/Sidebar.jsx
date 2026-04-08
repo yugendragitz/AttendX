@@ -59,7 +59,7 @@ export default function Sidebar({ activeItem = 'Dashboard', onNavigate }) {
           className="w-10 h-10 rounded-xl bg-white flex items-center justify-center"
           whileHover={{ scale: 1.1, rotate: 5 }}
         >
-          <span className="text-dark-900 font-black text-lg">Y</span>
+          <span className="text-dark-900 font-black text-lg">H</span>
         </motion.div>
         <AnimatePresence>
           {!isCollapsed && (
@@ -69,7 +69,7 @@ export default function Sidebar({ activeItem = 'Dashboard', onNavigate }) {
               exit={{ opacity: 0, x: -10 }}
               className="flex flex-col leading-tight"
             >
-              <span className="text-xl font-black text-white tracking-tight" style={{fontFamily: "Arial Black, Helvetica, sans-serif"}}>YUGI'S ATTENDX</span>
+              <span className="text-xl font-black text-white tracking-tight" style={{fontFamily: "Arial Black, Helvetica, sans-serif"}}>HIYU'S ATTENDX</span>
             </motion.div>
           )}
         </AnimatePresence>

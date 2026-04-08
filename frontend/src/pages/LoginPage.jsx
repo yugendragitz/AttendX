@@ -252,13 +252,13 @@ export default function LoginPage() {
                 transition={{ duration: 2, repeat: Infinity }}
               >
                 <div className="w-full h-full bg-dark-800 rounded-2xl flex items-center justify-center">
-                  <span className="text-3xl font-black text-white">Y</span>
+                  <span className="text-3xl font-black text-white">H</span>
                 </div>
               </motion.div>
               
               <h1 className="text-center mb-2">
                 <span className="block text-5xl md:text-7xl font-black tracking-tight text-white" style={{fontFamily: "Arial Black, Helvetica, sans-serif"}}>
-                  YUGI'S
+                  HIYU'S
                 </span>
                 <span className="block text-5xl md:text-7xl font-black tracking-tight text-white" style={{fontFamily: "Arial Black, Helvetica, sans-serif"}}>
                   ATTENDX
