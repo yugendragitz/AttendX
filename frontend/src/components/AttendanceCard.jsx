@@ -7,8 +7,7 @@ import {
   calculateLTPSBreakdown, 
   calculateWeightedAttendance,
   calculateClassesNeeded,
-  calculateSkippableClasses,
-  LTPS_WEIGHTS 
+  calculateSkippableClasses
 } from './LPTSCalculator'
 
 // Individual subject attendance card with LTPS weighted calculation
@@ -38,9 +37,30 @@ export default function AttendanceCard({ subject, index = 0, showWeighted = true
   // Use weighted or raw attendance based on toggle
   const displayAttendance = useWeighted && parsedLTPS.total > 0 ? weightedAttendance : rawAttendance
   
-  // Calculate bunk info based on selected mode
-  const classesNeeded = calculateClassesNeeded(breakdown)
-  const skippableClasses = calculateSkippableClasses(breakdown)
+  // Calculate how many real classes are needed/skippable based on actual class counts.
+  const calculateRawClassesNeeded = (attended, total, targetPercent = 75) => {
+    if (total <= 0) return 0
+    const targetRatio = targetPercent / 100
+    const needed = Math.ceil((targetRatio * total - attended) / (1 - targetRatio))
+    return Math.max(0, needed)
+  }
+
+  const calculateRawSkippableClasses = (attended, total, targetPercent = 75) => {
+    if (total <= 0) return 0
+    const targetRatio = targetPercent / 100
+    const skippable = Math.floor((attended / targetRatio) - total)
+    return Math.max(0, skippable)
+  }
+
+  // Weighted fallback is kept for cases where raw class counts are unavailable.
+  const weightedClassesNeeded = calculateClassesNeeded(breakdown)
+  const weightedSkippableClasses = calculateSkippableClasses(breakdown)
+  const classesNeeded = totalClasses > 0
+    ? calculateRawClassesNeeded(attendedClasses, totalClasses)
+    : weightedClassesNeeded
+  const skippableClasses = totalClasses > 0
+    ? calculateRawSkippableClasses(attendedClasses, totalClasses)
+    : weightedSkippableClasses
 
   // Determine status color and icon based on displayed attendance
   const getStatus = () => {
@@ -186,7 +206,7 @@ export default function AttendanceCard({ subject, index = 0, showWeighted = true
             >
               {displayAttendance < 75 ? (
                 <span className="text-xs font-semibold text-red-400">
-                  📌 Need {tcbr > 0 ? tcbr : classesNeeded} more classes for 75%
+                  📌 Need {classesNeeded} more classes for 75%
                 </span>
               ) : skippableClasses > 0 ? (
                 <span className="text-xs font-semibold text-cyan-400">
@@ -194,7 +214,7 @@ export default function AttendanceCard({ subject, index = 0, showWeighted = true
                 </span>
               ) : (
                 <span className="text-xs font-semibold text-yellow-400">
-                  ⚠️ At limit - attend all!
+                  ⚠️ Strict subject - attend all classes
                 </span>
               )}
             </motion.div>
